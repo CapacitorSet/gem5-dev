@@ -23,7 +23,7 @@ ARG packages
 # directory is expected to be mounted.
 ARG mountdir=/gem5
 
-# Install gem5 dependencies.
+# Install gem5 dependencies + Python 3
 # hadolint ignore=DL3008,DL3015
 RUN set -x \
     && apt-get update \
@@ -37,6 +37,7 @@ RUN set -x \
        python \
        python-dev \
        python-six \
+       python3 \
        scons \
        telnet \
        wget \
@@ -57,12 +58,6 @@ RUN set -x \
        > /usr/local/bin/gem5-dev \
     && chmod 755 /usr/local/bin/gem5-dev \
     && rm /gem5-dev.sh
-
-# Full system runs find their files with M5_PATH.
-ENV M5_PATH $mountdir/system
-
-# Full system runs expose console at port 3456. Use telnet or nc on MacOS.
-EXPOSE 3456/tcp
 
 # Run the front-end script, by default with the help command.
 ENTRYPOINT ["/usr/local/bin/gem5-dev"]

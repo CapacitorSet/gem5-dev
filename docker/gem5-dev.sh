@@ -17,11 +17,10 @@ Usage: gem5-dev <cmd>
 Where <cmd> is one of:
   help ............. prints this help message
   install-source ... installs the gem5 git source repository into ${sourcedir}
+  install-gcc ...... installs the ALPHA compiler into ${sourcedir}
   update-source .... updates the gem5 git source repository in ${sourcedir}
-  install-system ... installs the gem5 ARM system images in ${systemdir}
-  build ............ builds gem5 ARM binary
-  run-se ........... runs gem5 ARM in Syscall Emulation mode
-  run-fs ........... runs gem5 ARM in Full System mode
+  install-system ... installs the gem5 ALPHA system images in ${systemdir}
+  build ............ builds gem5 ALPHA binary
   shell | bash ..... enters into an interactive shell
 EOF
 }
@@ -43,10 +42,25 @@ EOF
 install_source() {
   check_hostdir_mounted
   if [ ! -e "${sourcedir}/.git" ]; then
-    echo "installing gem5 source respository into ${sourcedir} ..."
+    echo "installing gem5 source repository into ${sourcedir} ..."
     git clone https://gem5.googlesource.com/public/gem5 "${sourcedir}"
+    cd "${sourcedir}"
+    git checkout v19.0.0.0 # Last release that contains ALPHA
   else
-    echo "gem5 source respository is already installed."
+    echo "gem5 source repository is already installed."
+  fi
+}
+
+# Install an ALPHA compiler suitable for gem5
+install_gcc() {
+  check_hostdir_mounted
+  if [ ! -e "${sourcedir}/alphaev67-unknown-linux-gnu" ]; then
+    echo "downloading ALPHA compiler into ${sourcedir} ..."
+    wget http://www.m5sim.org/dist/current/alphaev67-unknown-linux-gnu.tar.bz2
+    tar -xjvf alphaev67-unknown-linux-gnu.tar.bz2
+    rm alphaev67-unknown-linux-gnu.tar.bz2
+  else
+    echo "gcc (alphaev67-unknown-linux-gnu) is already installed."
   fi
 }
 
@@ -54,109 +68,25 @@ install_source() {
 update_source() {
   check_hostdir_mounted
   if [[ -e "${sourcedir}/.git" ]]; then
-    echo "updatig gem5 source respository at ${sourcedir} ..."
+    echo "updating gem5 source repository at ${sourcedir} ..."
     cd "${sourcedir}" || exit 1
     git pull
   else
-    echo "gem5 source respository not found at ${sourcedir}."
+    echo "gem5 source repository not found at ${sourcedir}."
   fi
 }
 
-# Download full system image if it isn't aleady there.
-install_system() {
-  check_hostdir_mounted
-  if [[ ! -e "${systemdir}" ]]; then
-    echo "installing ARM full-system image into ${systemdir} ..."
-    mkdir "${systemdir}"
-    cd "${systemdir}" || exit 1
-    #--- http://www.gem5.org/dist/current/arm/* disappeared on 2020-01-29.
-    #--- Content is still visible at http://m5sim.org/dist/current/arm/.
-    # local image='aarch-system-20180409.tar.xz'
-    # echo "installing ARM full-system image $image"
-    # wget -O - "http://www.gem5.org/dist/current/arm/${image}" | tar xJvf -
-    #--- Using Pau's GitHub releases from 2018 instead.
-    local image='aarch-system-20180409.tar.xz'
-    echo "installing ARM full-system image $image"
-    local releases='https://github.com/metempsy'
-    releases+='/gem5_arm_fullsystem_files_generator/releases/download/20180409'
-    wget -O - "${releases}/${image}" | tar xJvf -
-    # Fix up image: ARM/dev/arm/RealView.py requires boot.arm64 to exist.
-    ln -s 'boot_emm.arm64' 'binaries/boot.arm64'
-  else
-    echo "ARM full-system image is already installed."
-  fi
-}
-
-# Builds the gem5 ARM binary.
+# Builds the gem5 ALPHA binary.
 build() {
   check_hostdir_mounted
   if [[ ! -e "${sourcedir}" ]]; then
-    echo "gem5 source respository not found at ${sourcedir}."
+    echo "gem5 source repository not found at ${sourcedir}."
     exit 1
   fi
 
-  echo "building gem5 ARM binary ..."
+  echo "building gem5 ALPHA binary ..."
   cd "${sourcedir}" || exit 1
-  # Building inst-constrs-3.cc is a memory hog and can easily run the
-  # container out of resources if done in parallel with other compiles. So
-  # we first build it alone and then build the rest.
-  local cmd="scons build/ARM/arch/arm/generated/inst-constrs-3.o"
-  echo "${cmd}"
-  ${cmd}
-  # Now build the rest in parallel.
-  cmd="scons -j $(nproc) build/ARM/gem5.opt"
-  echo "${cmd}"
-  ${cmd}
-}
-
-# Runs the gem5 ARM binary in Syscall Emulation mode.
-run_se() {
-  check_hostdir_mounted
-  if [[ ! -e "${sourcedir}" ]]; then
-    echo "gem5 source respository not found at ${sourcedir}."
-    exit 1
-  fi
-
-  echo "running gem5 ARM binary in Syscall Emulation mode ..."
-  cd "${sourcedir}" || exit 1
-  local -r simulator='build/ARM/gem5.opt'
-  local -r script='configs/example/se.py'
-  local -r binary='tests/test-progs/hello/bin/arm/linux/hello'
-  if [[ ! -e "${simulator}" ]]; then
-    echo "gem5 simulator binary ${simulator} not found."
-    exit 1
-  fi
-  local -r cmd="${simulator} ${script} -c ${binary}"
-  echo "${cmd}"
-  ${cmd}
-}
-
-# Runs the gem5 ARM binary in Full System mode.
-run_fs() {
-  check_hostdir_mounted
-  if [[ ! -e "${sourcedir}" ]]; then
-    echo "gem5 source respository not found at ${sourcedir}."
-    exit 1
-  fi
-  if [[ ! -e "${systemdir}" ]]; then
-    echo "gem5 ARM full system image not found at ${systemdir}."
-    exit 1
-  fi
-
-  echo "running gem5 ARM binary in Full System mode ..."
-  cd "${sourcedir}" || exit 1
-  local -r simulator='build/ARM/gem5.opt'
-  local -r script='configs/example/fs.py'
-
-  if [[ ! -e "${simulator}" ]]; then
-    echo "gem5 simulator binary ${simulator} not found."
-    exit 1
-  fi
-  local -r cmd="${simulator} ${script} \
-    --machine-type=VExpress_GEM5_V1 \
-    --dtb=armv8_gem5_v1_1cpu.dtb \
-    --kernel=vmlinux.vexpress_gem5_v1_64 \
-    --script=tests/halt.sh"
+  cmd="scons -j $(nproc) build/ALPHA/gem5.opt"
   echo "${cmd}"
   ${cmd}
 }
@@ -165,7 +95,7 @@ run_fs() {
 run_shell() {
   check_hostdir_mounted
   echo "To build gem5, run: "
-  echo "  cd ${sourcedir}; scons -j \$(nproc) build/ARM/gem5.opt"
+  echo "  cd ${sourcedir}; scons -j \$(nproc) build/ALPHA/gem5.opt"
   cd "${mountdir}" || exit 1
   exec /bin/bash -l
 }
@@ -177,11 +107,9 @@ main() {
     case "${cmd}" in
       'help') print_usage ;;
       'install-source') install_source ;;
+      'install-gcc') install_gcc ;;
       'update-source') update_source ;;
-      'install-system') install_system ;;
       'build') build ;;
-      'run-se') run_se ;;
-      'run-fs') run_fs ;;
       'shell' | 'bash') run_shell ;;
       -* | +*) set "${cmd}" ;; # pass +/-flags to shell's set command.
       *)
