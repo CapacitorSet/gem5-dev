@@ -23,7 +23,7 @@ ARG packages
 # directory is expected to be mounted.
 ARG mountdir=/gem5
 
-# Install gem5 dependencies + Python 3
+# Install gem5 dependencies + Python 3 + Make
 # hadolint ignore=DL3008,DL3015
 RUN set -x \
     && apt-get update \
@@ -42,6 +42,7 @@ RUN set -x \
        telnet \
        wget \
        zlib1g-dev \
+       make \
        $packages \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
